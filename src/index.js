@@ -1,67 +1,56 @@
 (function(window) {
   function Fundus(canvasId, imageUrl, options) {
-    var _canvas = document.getElementById(canvasId);
-    var _image = new Image();
-
-    var self = this;
-    var scale = 1.0;
-    var scaleStep = 0.1;
-
-    var events = [];
+    var canvas = document.getElementById(canvasId);
+    var image = new Image();
+    var gl, program, buffers, texture;
 
     function initialize() {
-      _image.src = imageUrl;
-      _image.onload = imageOnLoad;
+      image.src = imageUrl;
+      image.onload = imageOnLoad;
 
       addEventListeners();
     }
 
-    var vs = `
-      attribute vec4 aVertexPosition;
-      attribute vec2 aTextureCoord;
-      uniform mat4 uModelViewMatrix;
-      uniform mat4 uProjectionMatrix;
-      varying highp vec2 vTextureCoord;
-      void main(void) {
-        gl_Position = aVertexPosition * uModelViewMatrix;
-        vTextureCoord = aTextureCoord;
-      }
-    `;
-
-    var fs = `
-      varying highp vec2 vTextureCoord;
-      uniform sampler2D uSampler;
-      void main(void) {
-        gl_FragColor = texture2D(uSampler, vTextureCoord);
-      }
-    `;
-
     function imageOnLoad() {
-      resize(_image.width / 6, _image.height / 6);
-      render(vs, fs);
-    }
+      canvas.width = image.width / 6;
+      canvas.height = image.height / 6;
 
-    function resize(w, h) {
-      _canvas.width = w;
-      _canvas.height = h;
-    }
-
-    function render(vs, fs) {
-      var gl = _canvas.getContext('webgl');
+      gl = canvas.getContext('webgl');
       if (!gl) {
         alert('Unable to initialize WebGL. Your browser or machine may not support it.');
         return;
       }
 
-      var program = initShaderProgram(gl, vs, fs);
-      var buffers = initBuffers(gl);
-      var texture = initTexture(gl);
-      draw(gl, program, buffers, texture);
+      var vs = `
+        attribute vec4 aVertexPosition;
+        attribute vec2 aTextureCoord;
+        uniform mat4 uModelViewMatrix;
+        uniform mat4 uProjectionMatrix;
+        varying highp vec2 vTextureCoord;
+        void main(void) {
+          gl_Position = aVertexPosition * uModelViewMatrix;
+          vTextureCoord = aTextureCoord;
+        }
+      `;
+
+      var fs = `
+        varying highp vec2 vTextureCoord;
+        uniform sampler2D uSampler;
+        void main(void) {
+          gl_FragColor = texture2D(uSampler, vTextureCoord);
+        }
+      `;
+
+      initShaderProgram(vs, fs);
+      initBuffers();
+      initTexture();
+
+      render();
     }
 
-    function initShaderProgram(gl, vSrc, fSrc) {
-      var vShader = loadShader(gl, gl.VERTEX_SHADER, vSrc);
-      var fShader = loadShader(gl, gl.FRAGMENT_SHADER, fSrc);
+    function initShaderProgram(vSrc, fSrc) {
+      var vShader = loadShader(gl.VERTEX_SHADER, vSrc);
+      var fShader = loadShader(gl.FRAGMENT_SHADER, fSrc);
 
       var shaderProgram = gl.createProgram();
       gl.attachShader(shaderProgram, vShader);
@@ -73,7 +62,7 @@
         return null;
       }
 
-      return {
+      program =  {
         self: shaderProgram,
         attribLocations: {
           vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
@@ -85,9 +74,10 @@
           uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
         },
       };
+      return;
     }
 
-    function loadShader(gl, type, src) {
+    function loadShader(type, src) {
       var shader = gl.createShader(type);
       gl.shaderSource(shader, src);
       gl.compileShader(shader);
@@ -101,7 +91,7 @@
       return shader;
     }
 
-    function initBuffers(gl) {
+    function initBuffers() {
       var positionBuffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       const positions = [
@@ -131,48 +121,33 @@
       ];
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
     
-      return {
+      buffers = {
         position: positionBuffer,
         textureCoord: textureCoordBuffer,
         indices: indexBuffer,
       };
+      return;
     }
 
-    function initTexture(gl) {
-      var img = _image;
-      var texture = gl.createTexture();
+    function initTexture() {
+      texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, texture);
     
-      const level = 0;
-      const internalFormat = gl.RGBA;
-      const width = 1;
-      const height = 1;
-      const border = 0;
-      const srcFormat = gl.RGBA;
-      const srcType = gl.UNSIGNED_BYTE;
-      const pixel = new Uint8Array([0, 0, 255, 255]);  // opaque blue
-      gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
+      // gl.texImage2D(~, level, internalFormat, width, height, border, srcFormat, srcType, pixel);  // opaque blue
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,1);  // reserse Y
     
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, img);
-
-      function isPowerOf2(value) {
-        return (value & (value - 1)) == 0;
-      }
+      // gl.texImage2D(~, level, internalFormat, srcFormat, srcType, ~);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     
-      if (isPowerOf2(img.width) && isPowerOf2(img.height)) {
-        gl.generateMipmap(gl.TEXTURE_2D);
-      } else {
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      }
-    
-      return texture;
+      return;
     }
 
-    function draw(gl, program, buffers, texture) {
+    function render() {
       gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
       gl.clearDepth(1.0);                 // Clear everything
       gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -189,28 +164,16 @@
       const modelViewMatrix = mat4.create();
       mat4.scale(modelViewMatrix, modelViewMatrix, [scale, scale, scale]);
       mat4.translate(modelViewMatrix, modelViewMatrix, [0.0, 0.0, 0.0]);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+      // gl.vertexAttribPointer(~, numComponents, type, normalize, stride, offset);
+      gl.vertexAttribPointer(program.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(program.attribLocations.vertexPosition);
     
-      {
-        const numComponents = 3;
-        const type = gl.FLOAT;
-        const normalize = false;
-        const stride = 0;
-        const offset = 0;
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
-        gl.vertexAttribPointer(program.attribLocations.vertexPosition, numComponents, type, normalize, stride, offset);
-        gl.enableVertexAttribArray(program.attribLocations.vertexPosition);
-      }
-    
-      {
-        const numComponents = 2;
-        const type = gl.FLOAT;
-        const normalize = false;
-        const stride = 0;
-        const offset = 0;
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoord);
-        gl.vertexAttribPointer(program.attribLocations.textureCoord, numComponents, type, normalize, stride, offset);
-        gl.enableVertexAttribArray(program.attribLocations.textureCoord);
-      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoord);
+      // gl.vertexAttribPointer(~, numComponents, type, normalize, stride, offset);
+      gl.vertexAttribPointer(program.attribLocations.textureCoord, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(program.attribLocations.textureCoord);
     
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
     
@@ -223,17 +186,17 @@
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform1i(program.uniformLocations.uSampler, 0);
     
-      {
-        const vertexCount = 6;
-        const type = gl.UNSIGNED_SHORT;
-        const offset = 0;
-        gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
-      }
-    
+      // gl.drawElements(~, vertexCount, type, offset);
+      gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
     }
 
+    var self = this;
+    var scale = 1.0, scaleStep = 0.1, scaleMin = 1.0, scaleMax = 100.0;
+
+    var events = [];
+
     function addEventListeners() {
-      addEventListener(_canvas, 'mousewheel', onMouseWheel);  // except FireFox
+      addEventListener(canvas, 'mousewheel', onMouseWheel);  // except FireFox
     }
 
     function addEventListener(eventTarget, eventType, listener){
@@ -244,21 +207,44 @@
     function onMouseWheel(evt) {
       if (!evt) evt = event;
       evt.preventDefault();
-      if(evt.detail < 0 || evt.wheelDelta > 0){ // up -> smaller
-        self.zoomOut();
-      } else { // down -> larger
-        self.zoomIn();
+      if(evt.detail < 0 || evt.wheelDelta > 0){
+        // zoomOut: up -> smaller
+        scale = scale * (1 - scaleStep);
+        if (scale < scaleMin) return scale = scaleMin;
+        render();
+      } else {
+        // zoomIn: down -> larger
+        scale = scale * (1 + scaleStep);
+        if (scale > scaleMax) return scale = scaleMax;
+        render();
       }
     }
 
-    this.zoomIn = function() {
-      scale = scale * (1 + scaleStep);
-      render(vs, fs);
-    };
+    this.gray = function() {
+      var vs = `
+        attribute vec4 aVertexPosition;
+        attribute vec2 aTextureCoord;
+        uniform mat4 uModelViewMatrix;
+        uniform mat4 uProjectionMatrix;
+        varying highp vec2 vTextureCoord;
+        void main(void) {
+          gl_Position = aVertexPosition * uModelViewMatrix;
+          vTextureCoord = aTextureCoord;
+        }
+      `;
 
-    this.zoomOut = function() {
-      scale = scale * (1 - scaleStep);
-      render(vs, fs);
+      var fs = `
+        precision highp float;
+        varying highp vec2 vTextureCoord;
+        uniform sampler2D uSampler;
+        void main(void) {
+          float color = texture2D(uSampler, vTextureCoord).g;
+          gl_FragColor = vec4(color, color, color, 1.0);
+        }
+      `;
+
+      initShaderProgram(vs, fs);
+      render();
     };
 
     initialize();
