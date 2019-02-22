@@ -4,6 +4,26 @@
     var image = new Image();
     var gl, program, buffers, texture;
 
+    var vs = `
+      attribute vec4 aVertexPosition;
+      attribute vec2 aTextureCoord;
+      uniform mat4 uModelViewMatrix;
+      uniform mat4 uProjectionMatrix;
+      varying highp vec2 vTextureCoord;
+      void main(void) {
+        gl_Position = uModelViewMatrix * aVertexPosition;
+        vTextureCoord = aTextureCoord;
+      }
+    `;
+
+    var fs = `
+      varying highp vec2 vTextureCoord;
+      uniform sampler2D uSampler;
+      void main(void) {
+        gl_FragColor = texture2D(uSampler, vTextureCoord);
+      }
+    `;
+
     function initialize() {
       image.src = imageUrl;
       image.onload = imageOnLoad;
@@ -12,34 +32,11 @@
     }
 
     function imageOnLoad() {
-      canvas.width = image.width / 6;
-      canvas.height = image.height / 6;
-
       gl = canvas.getContext('webgl');
       if (!gl) {
         alert('Unable to initialize WebGL. Your browser or machine may not support it.');
         return;
       }
-
-      var vs = `
-        attribute vec4 aVertexPosition;
-        attribute vec2 aTextureCoord;
-        uniform mat4 uModelViewMatrix;
-        uniform mat4 uProjectionMatrix;
-        varying highp vec2 vTextureCoord;
-        void main(void) {
-          gl_Position = aVertexPosition * uModelViewMatrix;
-          vTextureCoord = aTextureCoord;
-        }
-      `;
-
-      var fs = `
-        varying highp vec2 vTextureCoord;
-        uniform sampler2D uSampler;
-        void main(void) {
-          gl_FragColor = texture2D(uSampler, vTextureCoord);
-        }
-      `;
 
       initShaderProgram(vs, fs);
       initBuffers();
@@ -94,11 +91,19 @@
     function initBuffers() {
       var positionBuffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+      var factor = { x: 1.0, y: 1.0 };  // adapt to the canvas
+      if ((canvas.width / canvas.height) <= (image.width / image.height)) {
+        factor.y = image.height * (canvas.width / image.width) / canvas.height;
+      } else {
+        factor.x = image.width * (canvas.height / image.height) / canvas.width;
+      }
+
       const positions = [
-        -1.0, -1.0,  0.0,
-         1.0, -1.0,  0.0,
-         1.0,  1.0,  0.0,
-        -1.0,  1.0,  0.0,
+        -1.0 * factor.x, -1.0 * factor.y,  0.0,
+         1.0 * factor.x, -1.0 * factor.y,  0.0,
+         1.0 * factor.x,  1.0 * factor.y,  0.0,
+        -1.0 * factor.x,  1.0 * factor.y,  0.0,
       ];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
     
@@ -162,8 +167,9 @@
       mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
     
       const modelViewMatrix = mat4.create();
-      mat4.scale(modelViewMatrix, modelViewMatrix, [scale, scale, scale]);
-      mat4.translate(modelViewMatrix, modelViewMatrix, [0.0, 0.0, 0.0]);
+      mat4.identity(modelViewMatrix);
+      mat4.scale(modelViewMatrix, modelViewMatrix, [scaleOffset, scaleOffset, scaleOffset]);
+      mat4.translate(modelViewMatrix, modelViewMatrix, [translateOffset.x, translateOffset.y, 0.0]);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
       // gl.vertexAttribPointer(~, numComponents, type, normalize, stride, offset);
@@ -191,49 +197,80 @@
     }
 
     var self = this;
-    var scale = 1.0, scaleStep = 0.1, scaleMin = 1.0, scaleMax = 100.0;
+    var scaleOffset = 1.0, scaleStep = 0.1, scaleMin = 1.0, scaleMax = 100.0;
+    var dragging = false, lastPos = {}, translateStep = 0.002;
+    var translateOffset = { x: 0, y: 0 };
+    var center = { x: 0, y: 0 };
 
     var events = [];
 
     function addEventListeners() {
       addEventListener(canvas, 'mousewheel', onMouseWheel);  // except FireFox
+      addEventListener(canvas, 'mousedown', onMouseDown);
+      addEventListener(canvas, 'mouseup', onMouseUp);
+      addEventListener(canvas, 'mousemove', onMouseMove);
+      addEventListener(canvas, 'mouseout', onMouseOut);
     }
 
     function addEventListener(eventTarget, eventType, listener){
       eventTarget.addEventListener(eventType, listener);
-      events.push({eventTarget: eventTarget, eventType: eventType, listener: listener});
+      events.push({
+        eventTarget: eventTarget,
+        eventType: eventType,
+        listener: listener
+      });
     }
 
     function onMouseWheel(evt) {
       if (!evt) evt = event;
       evt.preventDefault();
-      if(evt.detail < 0 || evt.wheelDelta > 0){
+      if (evt.detail < 0 || evt.wheelDelta > 0) {
         // zoomOut: up -> smaller
-        scale = scale * (1 - scaleStep);
-        if (scale < scaleMin) return scale = scaleMin;
+        scaleOffset = scaleOffset * (1 - scaleStep);
+        // if (scaleOffset < scaleMin) return scaleOffset = scaleMin;
         render();
       } else {
         // zoomIn: down -> larger
-        scale = scale * (1 + scaleStep);
-        if (scale > scaleMax) return scale = scaleMax;
+        scaleOffset = scaleOffset * (1 + scaleStep);
+        // if (scaleOffset > scaleMax) return scaleOffset = scaleMax;
         render();
       }
     }
 
-    this.gray = function() {
-      var vs = `
-        attribute vec4 aVertexPosition;
-        attribute vec2 aTextureCoord;
-        uniform mat4 uModelViewMatrix;
-        uniform mat4 uProjectionMatrix;
-        varying highp vec2 vTextureCoord;
-        void main(void) {
-          gl_Position = aVertexPosition * uModelViewMatrix;
-          vTextureCoord = aTextureCoord;
-        }
-      `;
+    function onMouseDown(evt){
+      if (evt.button === 0) {
+        dragging = true;
+        lastPos.x = evt.clientX;
+        lastPos.y = evt.clientY;
+      }
+    }
 
-      var fs = `
+    function onMouseUp(evt) {
+      if (evt.button === 0) {
+        console.log('mouse up');
+        dragging = false;
+        center.x = center.x + (lastPos.x - evt.clientX);
+        center.y = center.y + (lastPos.y - evt.clientY);
+      }
+    }
+
+    function onMouseMove(evt) {
+      if (dragging) {
+        translateOffset.x = (evt.clientX - lastPos.x - center.x) * translateStep;
+        translateOffset.y = (lastPos.y - evt.clientY + center.y) * translateStep;
+        render();
+      }
+    }
+
+    function onMouseOut(evt) {
+      console.log('mouse out');
+      dragging = false;
+      center.x = center.x + (lastPos.x - evt.clientX);
+      center.y = center.y + (lastPos.y - evt.clientY);
+    }
+
+    this.gray = function() {
+      var newFs = `
         precision highp float;
         varying highp vec2 vTextureCoord;
         uniform sampler2D uSampler;
@@ -243,7 +280,7 @@
         }
       `;
 
-      initShaderProgram(vs, fs);
+      initShaderProgram(vs, newFs);
       render();
     };
 
