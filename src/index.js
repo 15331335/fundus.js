@@ -17,10 +17,15 @@
     `;
 
     var fs = `
+      precision highp float;
       varying highp vec2 vTextureCoord;
       uniform sampler2D uSampler;
+      uniform vec4 uColorAlpha;
       void main(void) {
-        gl_FragColor = texture2D(uSampler, vTextureCoord);
+        float red = texture2D(uSampler, vTextureCoord).r * uColorAlpha.x;
+        float green = texture2D(uSampler, vTextureCoord).g * uColorAlpha.y;
+        float blue = texture2D(uSampler, vTextureCoord).b * uColorAlpha.z;
+        gl_FragColor = vec4(red, green, blue, 1.0);
       }
     `;
 
@@ -69,6 +74,7 @@
           projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
           modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
           uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
+          uColorAlpha: gl.getUniformLocation(shaderProgram, 'uColorAlpha'),  // TODO: object option
         },
       };
       return;
@@ -191,6 +197,8 @@
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform1i(program.uniformLocations.uSampler, 0);
+
+      gl.uniform4fv(program.uniformLocations.uColorAlpha, alpha);  // TODO: callback
     
       // gl.drawElements(~, vertexCount, type, offset);
       gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
@@ -201,6 +209,7 @@
     var dragging = false, lastPos = {}, translateStep = 0.002;
     var translateOffset = { x: 0, y: 0 };
     var center = { x: 0, y: 0 };
+    var alpha = [1.0, 1.0, 1.0, 1.0];
 
     var events = [];
 
@@ -264,9 +273,7 @@
 
     function onMouseOut(evt) {
       console.log('mouse out');
-      dragging = false;
-      center.x = center.x + (lastPos.x - evt.clientX);
-      center.y = center.y + (lastPos.y - evt.clientY);
+      dragging = false;  // stop directly
     }
 
     this.gray = function() {
@@ -281,6 +288,21 @@
       `;
 
       initShaderProgram(vs, newFs);
+      render();
+    };
+
+    this.setColorAlpha = function(channnel, value) {
+      var channnels = 'rgb';
+      var c = channnels.indexOf(channnel);
+      if (c != -1 && value >= 0.0 && value <= 1.0) {
+        alpha[c] = value;
+        render();
+      }
+    };
+
+    this.origin = function() {
+      alpha = [1.0, 1.0, 1.0, 1.0];
+      initShaderProgram(vs, fs);
       render();
     };
 
