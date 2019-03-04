@@ -75,6 +75,9 @@
           modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
           uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
           uColorAlpha: gl.getUniformLocation(shaderProgram, 'uColorAlpha'),  // TODO: object option
+          uTextureSize: gl.getUniformLocation(shaderProgram, "uTextureSize"),
+          uKernel: gl.getUniformLocation(shaderProgram, "uKernel[0]"),
+          uKernelWeight: gl.getUniformLocation(shaderProgram, "uKernelWeight"),
         },
       };
       return;
@@ -199,6 +202,9 @@
       gl.uniform1i(program.uniformLocations.uSampler, 0);
 
       gl.uniform4fv(program.uniformLocations.uColorAlpha, alpha);  // TODO: callback
+      gl.uniform2f(program.uniformLocations.uTextureSize, image.width, image.height);
+      gl.uniform1fv(program.uniformLocations.uKernel, kernels['gaussianBlur']);
+      gl.uniform1f(program.uniformLocations.uKernelWeight, computeKernelWeight(kernels['gaussianBlur']));
     
       // gl.drawElements(~, vertexCount, type, offset);
       gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
@@ -256,7 +262,6 @@
 
     function onMouseUp(evt) {
       if (evt.button === 0) {
-        console.log('mouse up');
         dragging = false;
         center.x = center.x + (lastPos.x - evt.clientX);
         center.y = center.y + (lastPos.y - evt.clientY);
@@ -272,7 +277,6 @@
     }
 
     function onMouseOut(evt) {
-      console.log('mouse out');
       dragging = false;  // stop directly
     }
 
@@ -304,6 +308,55 @@
       alpha = [1.0, 1.0, 1.0, 1.0];
       initShaderProgram(vs, fs);
       render();
+    };
+
+    this.blur = function() {
+      var newFs = `
+        precision highp float;
+        varying highp vec2 vTextureCoord;
+        uniform sampler2D uSampler;
+
+        uniform vec2 uTextureSize;
+        uniform float uKernel[9];
+        uniform float uKernelWeight;
+
+        void main(void) {
+          vec2 onePixel = vec2(1.0, 1.0) / uTextureSize;
+          vec4 colorSum =
+            texture2D(uSampler, vTextureCoord + onePixel * vec2(-1, -1)) * uKernel[0] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 0, -1)) * uKernel[1] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 1, -1)) * uKernel[2] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2(-1,  0)) * uKernel[3] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 0,  0)) * uKernel[4] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 1,  0)) * uKernel[5] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2(-1,  1)) * uKernel[6] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 0,  1)) * uKernel[7] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 1,  1)) * uKernel[8] ;
+          gl_FragColor = vec4((colorSum / uKernelWeight).rgb, 1);
+        }
+      `;
+      initShaderProgram(vs, newFs);
+      render();
+    };
+
+    function computeKernelWeight(kernel) {
+      var weight = kernel.reduce(function(prev, curr) {
+          return prev + curr;
+      });
+      return weight <= 0 ? 1 : weight;
+    }
+
+    var kernels = {
+      normal: [
+        0, 0, 0,
+        0, 1, 0,
+        0, 0, 0
+      ],
+      gaussianBlur: [
+        1, 2, 1,
+        2, 4, 2,
+        1, 2, 1
+      ],
     };
 
     initialize();
