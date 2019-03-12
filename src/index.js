@@ -168,17 +168,27 @@
       gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
-      const fieldOfView = 45 * Math.PI / 180;
-      const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-      const zNear = 0.1;
-      const zFar = 100.0;
-      const projectionMatrix = mat4.create();
-      mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
+      // const fieldOfView = 45 * Math.PI / 180;
+      // const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+      // const zNear = 0.1;
+      // const zFar = 100.0;
+      // const projectionMatrix = mat4.create();
+      // mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
+
+      const projectionMatrix = ccallArrays("perspective", "array", ["array", "number", "number"],
+        [[1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1], gl.canvas.clientWidth, gl.canvas.clientHeight],
+        {heapIn: "HEAPF32", heapOut: "HEAPF32", returnArraySize: 16}
+      )
     
-      const modelViewMatrix = mat4.create();
-      mat4.identity(modelViewMatrix);
-      mat4.scale(modelViewMatrix, modelViewMatrix, [scaleOffset, scaleOffset, scaleOffset]);
-      mat4.translate(modelViewMatrix, modelViewMatrix, [translateOffset.x, translateOffset.y, 0.0]);
+      // const modelViewMatrix = mat4.create();
+      // mat4.identity(modelViewMatrix);
+      // mat4.scale(modelViewMatrix, modelViewMatrix, [scaleOffset, scaleOffset, scaleOffset]);
+      // mat4.translate(modelViewMatrix, modelViewMatrix, [translateOffset.x, translateOffset.y, 0.0]);
+
+      const modelViewMatrix = ccallArrays("scaleAndTranslate", "array", ["array", "number", "number", "nnumber"],
+        [[1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1], scaleOffset, translateOffset.x, translateOffset.y],
+        {heapIn: "HEAPF32", heapOut: "HEAPF32", returnArraySize: 16}
+      )
 
       gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
       // gl.vertexAttribPointer(~, numComponents, type, normalize, stride, offset);

@@ -9,28 +9,23 @@
     Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
   </canvas>
   <div>
-    <button onclick="getOrigin()">原图</button>
-    <button onclick="getGray()">灰度</button>
-    <button onclick="getBlur()">模糊</button>
-    <button onclick="getEdge()">边缘</button>
+    <button id="btnOrigin">原图</button>
+    <button id="btnGray">灰度</button>
+    <button id="btnBlur">模糊</button>
+    <button id="btnEdge">边缘</button>
   </div>
   <script src="gl-matrix.js"></script>
   <script src="fundus.js"></script>
-  <script async type="text/javascript" src="wasm.js"></script>
+  <script src="wasm.js"></script>
+  <script src="array.js"></script>
   <script type="text/javascript">
-    var f = new Fundus('glcanvas', 'http://localhost:8080/image.jpg');
-    function getOrigin() {
-      f.origin();
-    }
-    function getGray() {
-      f.gray();
-    }
-    function getBlur() {
-      f.blur();
-    }
-    function getEdge() {
-      f.edge();
-    }
+    window.addEventListener("wasmLoaded", () => {
+      var f = new Fundus('glcanvas', 'http://localhost:8080/lena.jpg');
+      document.getElementById('btnOrigin').addEventListener('click', () => {f.origin();});
+      document.getElementById('btnGray').addEventListener('click', () => {f.gray();});
+      document.getElementById('btnBlur').addEventListener('click', () => {f.blur();});
+      document.getElementById('btnEdge').addEventListener('click', () => {f.edge();});
+    })
   </script>
 </body>
 </html>
