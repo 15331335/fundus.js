@@ -1,6 +1,14 @@
 # Fundus.js
 
-Fundus.js is my graduation thesis (design).
+Fundus.js is my graduation design.
+
+## Attention
+
+1. Install `WebAssembly` so that replace the `dist/gl-matrix.js`.
+
+2. Check the `dist/index.html` to understand the order of scripts.
+
+3. Use `npm` to install and run `compile` before `test`.
 
 ## Demo
 
@@ -17,3 +25,7 @@ It is the fundus in JS:
 ```javascript
 var f = new Fundus('glcanvas', 'http://localhost:8080/image.jpg');
 ```
+
+## TODO
+
+...
