@@ -125,10 +125,9 @@
         0.0,  1.0,
       ];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
+
       var indexBuffer = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    
-    
       const indices = [
         0,  1,  2,      
         0,  2,  3,
@@ -168,27 +167,15 @@
       gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
-      // const fieldOfView = 45 * Math.PI / 180;
-      // const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-      // const zNear = 0.1;
-      // const zFar = 100.0;
-      // const projectionMatrix = mat4.create();
-      // mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
-
-      const projectionMatrix = ccallArrays("perspective", "array", ["array", "number", "number"],
-        [[1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1], gl.canvas.clientWidth, gl.canvas.clientHeight],
-        {heapIn: "HEAPF32", heapOut: "HEAPF32", returnArraySize: 16}
-      )
-    
-      // const modelViewMatrix = mat4.create();
-      // mat4.identity(modelViewMatrix);
-      // mat4.scale(modelViewMatrix, modelViewMatrix, [scaleOffset, scaleOffset, scaleOffset]);
-      // mat4.translate(modelViewMatrix, modelViewMatrix, [translateOffset.x, translateOffset.y, 0.0]);
-
-      const modelViewMatrix = ccallArrays("scaleAndTranslate", "array", ["array", "number", "number", "nnumber"],
-        [[1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1], scaleOffset, translateOffset.x, translateOffset.y],
-        {heapIn: "HEAPF32", heapOut: "HEAPF32", returnArraySize: 16}
-      )
+      const projectionMatrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];  // no perspective
+      const modelViewMatrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+      for (var i = 0; i < modelViewMatrix.length; i++) {
+        if (i < 12) {
+          modelViewMatrix[i] = modelViewMatrix[i] * scaleOffset;  // scale
+        } else {
+          modelViewMatrix[i] = modelViewMatrix[i-12] * translateOffset.x + modelViewMatrix[i-8] * translateOffset.y + modelViewMatrix[i];  // translate
+        }
+      }
 
       gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
       // gl.vertexAttribPointer(~, numComponents, type, normalize, stride, offset);
@@ -218,30 +205,18 @@
       gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
     }
 
-    var self = this;
     var scaleOffset = 1.0, scaleStep = 0.1, scaleMin = 1.0, scaleMax = 100.0;
     var dragging = false, lastPos = {}, translateStep = 0.002;
     var translateOffset = { x: 0, y: 0 };
     var center = { x: 0, y: 0 };
     var alpha = [1.0, 1.0, 1.0, 1.0];
 
-    var events = [];
-
     function addEventListeners() {
-      addEventListener(canvas, 'mousewheel', onMouseWheel);  // except FireFox
-      addEventListener(canvas, 'mousedown', onMouseDown);
-      addEventListener(canvas, 'mouseup', onMouseUp);
-      addEventListener(canvas, 'mousemove', onMouseMove);
-      addEventListener(canvas, 'mouseout', onMouseOut);
-    }
-
-    function addEventListener(eventTarget, eventType, listener){
-      eventTarget.addEventListener(eventType, listener);
-      events.push({
-        eventTarget: eventTarget,
-        eventType: eventType,
-        listener: listener
-      });
+      canvas.addEventListener('mousewheel', onMouseWheel);  // except FireFox
+      canvas.addEventListener('mousedown', onMouseDown);
+      canvas.addEventListener('mouseup', onMouseUp);
+      canvas.addEventListener('mousemove', onMouseMove);
+      canvas.addEventListener('mouseout', onMouseOut);
     }
 
     function onMouseWheel(evt) {
@@ -295,7 +270,7 @@
         uniform sampler2D uSampler;
         void main(void) {
           float color = texture2D(uSampler, vTextureCoord).g;
-          gl_FragColor = vec4(color, color, color, 1.0);
+          gl_FragColor = vec4(color, color, color, 1.0);  // rgb -> ggg
         }
       `;
 
@@ -312,7 +287,10 @@
       }
     };
 
-    this.origin = function() {
+    this.reset = function() {
+      scaleOffset = 1.0;
+      translateOffset = { x: 0, y: 0 };
+      center = { x: 0, y: 0 };
       alpha = [1.0, 1.0, 1.0, 1.0];
       initShaderProgram(vs, fs);
       render();
@@ -367,11 +345,6 @@
     }
 
     var kernels = {
-      normal: [
-        0, 0, 0,
-        0, 1, 0,
-        0, 0, 0
-      ],
       gaussianBlur: [
         1, 2, 1,
         2, 4, 2,
