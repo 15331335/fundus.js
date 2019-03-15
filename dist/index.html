@@ -9,23 +9,26 @@
     Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
   </canvas>
   <div>
-    <button id="btnOrigin">原图</button>
-    <button id="btnGray">灰度</button>
-    <button id="btnBlur">模糊</button>
-    <button id="btnEdge">边缘</button>
+    <div>
+      <button id="btnOrigin">重置图片</button>
+      <button id="btnGray">灰度</button>
+      <button id="btnBlur">高斯模糊</button>
+      <button id="btnEdge">提取边缘</button>
+    </div>
+    <div>R: <input type="range" min="0" max="100" id="rangeR" value="100" /></div>
+    <div>G: <input type="range" min="0" max="100" id="rangeG" value="100" /></div>
+    <div>B: <input type="range" min="0" max="100" id="rangeB" value="100" /></div>
   </div>
-  <script src="gl-matrix.js"></script>
   <script src="fundus.js"></script>
-  <script src="wasm.js"></script>
-  <script src="array.js"></script>
   <script type="text/javascript">
-    window.addEventListener("wasmLoaded", () => {
-      var f = new Fundus('glcanvas', 'http://localhost:8080/lena.jpg');
-      document.getElementById('btnOrigin').addEventListener('click', () => {f.origin();});
-      document.getElementById('btnGray').addEventListener('click', () => {f.gray();});
-      document.getElementById('btnBlur').addEventListener('click', () => {f.blur();});
-      document.getElementById('btnEdge').addEventListener('click', () => {f.edge();});
-    })
+    var f = new Fundus('glcanvas', 'http://localhost:8080/lena.jpg');
+    document.getElementById('btnOrigin').addEventListener('click', () => {f.reset();});
+    document.getElementById('btnGray').addEventListener('click', () => {f.gray();});
+    document.getElementById('btnBlur').addEventListener('click', () => {f.blur();});
+    document.getElementById('btnEdge').addEventListener('click', () => {f.edge();});
+    document.getElementById('rangeR').addEventListener('change', () => {f.setColorAlpha('r', document.getElementById('rangeR').value/100);});
+    document.getElementById('rangeG').addEventListener('change', () => {f.setColorAlpha('g', document.getElementById('rangeG').value/100);});
+    document.getElementById('rangeB').addEventListener('change', () => {f.setColorAlpha('b', document.getElementById('rangeB').value/100);});
   </script>
 </body>
 </html>
