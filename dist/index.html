@@ -12,23 +12,19 @@
     <div>
       <button id="btnOrigin">重置图片</button>
       <button id="btnGray">灰度</button>
-      <button id="btnBlur">高斯模糊</button>
       <button id="btnEdge">提取边缘</button>
+      <button id="btnSharp">锐化</button>
     </div>
-    <div>R: <input type="range" min="0" max="100" id="rangeR" value="100" /></div>
-    <div>G: <input type="range" min="0" max="100" id="rangeG" value="100" /></div>
-    <div>B: <input type="range" min="0" max="100" id="rangeB" value="100" /></div>
+    <div>Threshold: <input type="range" min="0" max="100" id="threshold" value="0" /></div>
   </div>
   <script src="fundus.js"></script>
   <script type="text/javascript">
     var f = new Fundus('glcanvas', 'http://localhost:8080/lena.jpg');
     document.getElementById('btnOrigin').addEventListener('click', () => {f.reset();});
-    document.getElementById('btnGray').addEventListener('click', () => {f.gray();});
-    document.getElementById('btnBlur').addEventListener('click', () => {f.blur();});
-    document.getElementById('btnEdge').addEventListener('click', () => {f.edge();});
-    document.getElementById('rangeR').addEventListener('change', () => {f.setColorAlpha('r', document.getElementById('rangeR').value/100);});
-    document.getElementById('rangeG').addEventListener('change', () => {f.setColorAlpha('g', document.getElementById('rangeG').value/100);});
-    document.getElementById('rangeB').addEventListener('change', () => {f.setColorAlpha('b', document.getElementById('rangeB').value/100);});
+    document.getElementById('btnGray').addEventListener('click', () => {f.setGrayChannel('g');});
+    document.getElementById('btnEdge').addEventListener('click', () => {f.setMat3kernel([0, -1, 0, -1, 4, -1, 0, -1, 0]);});
+    document.getElementById('btnSharp').addEventListener('click', () => {f.setMat3kernel([0, -1, 0, -1, 5, -1, 0, -1, 0]);});
+    document.getElementById('threshold').addEventListener('change', () => {f.setThreshold(document.getElementById('threshold').value/100);});
   </script>
 </body>
 </html>

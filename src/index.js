@@ -8,7 +8,6 @@
       attribute vec4 aVertexPosition;
       attribute vec2 aTextureCoord;
       uniform mat4 uModelViewMatrix;
-      uniform mat4 uProjectionMatrix;
       varying highp vec2 vTextureCoord;
       void main(void) {
         gl_Position = uModelViewMatrix * aVertexPosition;
@@ -20,12 +19,8 @@
       precision highp float;
       varying highp vec2 vTextureCoord;
       uniform sampler2D uSampler;
-      uniform vec4 uColorAlpha;
       void main(void) {
-        float red = texture2D(uSampler, vTextureCoord).r * uColorAlpha.x;
-        float green = texture2D(uSampler, vTextureCoord).g * uColorAlpha.y;
-        float blue = texture2D(uSampler, vTextureCoord).b * uColorAlpha.z;
-        gl_FragColor = vec4(red, green, blue, 1.0);
+        gl_FragColor = texture2D(uSampler, vTextureCoord);
       }
     `;
 
@@ -50,7 +45,7 @@
       render();
     }
 
-    function initShaderProgram(vSrc, fSrc) {
+    function initShaderProgram(vSrc, fSrc, uObj) {
       var vShader = loadShader(gl.VERTEX_SHADER, vSrc);
       var fShader = loadShader(gl.FRAGMENT_SHADER, fSrc);
 
@@ -71,15 +66,17 @@
           textureCoord: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
         },
         uniformLocations: {
-          projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
           modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
           uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
-          uColorAlpha: gl.getUniformLocation(shaderProgram, 'uColorAlpha'),  // TODO: object option
-          uTextureSize: gl.getUniformLocation(shaderProgram, "uTextureSize"),
-          uKernel: gl.getUniformLocation(shaderProgram, "uKernel[0]"),
-          uKernelWeight: gl.getUniformLocation(shaderProgram, "uKernelWeight"),
         },
       };
+
+      if (uObj) {
+        for (var key in uObj) {
+          program.uniformLocations[key] = gl.getUniformLocation(shaderProgram, uObj[key]);
+        }
+      }
+
       return;
     }
 
@@ -119,10 +116,10 @@
       var textureCoordBuffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
       const textureCoordinates = [
-        0.0,  0.0,
-        1.0,  0.0,
-        1.0,  1.0,
         0.0,  1.0,
+        1.0,  1.0,
+        1.0,  0.0,
+        0.0,  0.0,
       ];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
 
@@ -145,12 +142,7 @@
     function initTexture() {
       texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, texture);
-    
-      // gl.texImage2D(~, level, internalFormat, width, height, border, srcFormat, srcType, pixel);  // opaque blue
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,1);  // reserse Y
-    
-      gl.bindTexture(gl.TEXTURE_2D, texture);
+
       // gl.texImage2D(~, level, internalFormat, srcFormat, srcType, ~);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -160,14 +152,13 @@
       return;
     }
 
-    function render() {
+    function render(uFunc) {
       gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
       gl.clearDepth(1.0);                 // Clear everything
       gl.enable(gl.DEPTH_TEST);           // Enable depth testing
       gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
-      const projectionMatrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];  // no perspective
       const modelViewMatrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
       for (var i = 0; i < modelViewMatrix.length; i++) {
         if (i < 12) {
@@ -190,16 +181,12 @@
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
     
       gl.useProgram(program.self);
-    
-      gl.uniformMatrix4fv(program.uniformLocations.projectionMatrix, false, projectionMatrix);
       gl.uniformMatrix4fv(program.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+      if (uFunc) uFunc();
     
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform1i(program.uniformLocations.uSampler, 0);
-
-      gl.uniform4fv(program.uniformLocations.uColorAlpha, alpha);  // TODO: callback
-      gl.uniform2f(program.uniformLocations.uTextureSize, image.width, image.height);
     
       // gl.drawElements(~, vertexCount, type, offset);
       gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
@@ -209,7 +196,6 @@
     var dragging = false, lastPos = {}, translateStep = 0.002;
     var translateOffset = { x: 0, y: 0 };
     var center = { x: 0, y: 0 };
-    var alpha = [1.0, 1.0, 1.0, 1.0];
 
     function addEventListeners() {
       canvas.addEventListener('mousewheel', onMouseWheel);  // except FireFox
@@ -263,98 +249,99 @@
       dragging = false;  // stop directly
     }
 
-    this.gray = function() {
-      var newFs = `
-        precision highp float;
-        varying highp vec2 vTextureCoord;
-        uniform sampler2D uSampler;
-        void main(void) {
-          float color = texture2D(uSampler, vTextureCoord).g;
-          gl_FragColor = vec4(color, color, color, 1.0);  // rgb -> ggg
-        }
-      `;
-
-      initShaderProgram(vs, newFs);
-      render();
-    };
-
-    this.setColorAlpha = function(channnel, value) {
-      var channnels = 'rgb';
-      var c = channnels.indexOf(channnel);
-      if (c != -1 && value >= 0.0 && value <= 1.0) {
-        alpha[c] = value;
-        render();
-      }
-    };
-
     this.reset = function() {
       scaleOffset = 1.0;
       translateOffset = { x: 0, y: 0 };
       center = { x: 0, y: 0 };
-      alpha = [1.0, 1.0, 1.0, 1.0];
       initShaderProgram(vs, fs);
       render();
     };
 
-    var kernel9Fs = `
-      precision highp float;
-      varying highp vec2 vTextureCoord;
-      uniform sampler2D uSampler;
+    this.setGrayChannel = function(channel) {
+      var gray = [0.0, 0.0, 0.0];
+      gray['rgb'.indexOf(channel)] = 1.0;
+      var newFs = `
+        precision highp float;
+        varying highp vec2 vTextureCoord;
+        uniform sampler2D uSampler;
+        uniform float uGrayChannel[3];
 
-      uniform vec2 uTextureSize;
-      uniform float uKernel[9];
-      uniform float uKernelWeight;
+        void main(void) {
+          float gray;
+          for (int i = 0; i < 3; i++) {
+            gray += texture2D(uSampler, vTextureCoord)[i] * uGrayChannel[i];
+          }
+          gl_FragColor = vec4(gray, gray, gray, 1.0);
+        }
+      `;
 
-      void main(void) {
-        vec2 onePixel = vec2(1.0, 1.0) / uTextureSize;
-        vec4 colorSum =
-          texture2D(uSampler, vTextureCoord + onePixel * vec2(-1, -1)) * uKernel[0] +
-          texture2D(uSampler, vTextureCoord + onePixel * vec2( 0, -1)) * uKernel[1] +
-          texture2D(uSampler, vTextureCoord + onePixel * vec2( 1, -1)) * uKernel[2] +
-          texture2D(uSampler, vTextureCoord + onePixel * vec2(-1,  0)) * uKernel[3] +
-          texture2D(uSampler, vTextureCoord + onePixel * vec2( 0,  0)) * uKernel[4] +
-          texture2D(uSampler, vTextureCoord + onePixel * vec2( 1,  0)) * uKernel[5] +
-          texture2D(uSampler, vTextureCoord + onePixel * vec2(-1,  1)) * uKernel[6] +
-          texture2D(uSampler, vTextureCoord + onePixel * vec2( 0,  1)) * uKernel[7] +
-          texture2D(uSampler, vTextureCoord + onePixel * vec2( 1,  1)) * uKernel[8] ;
-        gl_FragColor = vec4((colorSum / uKernelWeight).rgb, 1);
-      }
-    `;
-
-    this.blur = function() {
-      initShaderProgram(vs, kernel9Fs);
-      gl.useProgram(program.self);
-      gl.uniform1fv(program.uniformLocations.uKernel, kernels['gaussianBlur']);
-      gl.uniform1f(program.uniformLocations.uKernelWeight, computeKernelWeight(kernels['gaussianBlur']));
-      render();
-    };
-
-    this.edge = function() {
-      initShaderProgram(vs, kernel9Fs);
-      gl.useProgram(program.self);
-      gl.uniform1fv(program.uniformLocations.uKernel, kernels['laplacianEdge']);
-      gl.uniform1f(program.uniformLocations.uKernelWeight, computeKernelWeight(kernels['laplacianEdge']));
-      render();
-    };
-
-    function computeKernelWeight(kernel) {
-      var weight = kernel.reduce(function(prev, curr) {
-          return prev + curr;
+      initShaderProgram(vs, newFs, {
+        uGrayChannel: 'uGrayChannel[0]',
       });
-      return weight <= 0 ? 1 : weight;
-    }
+      render(function() {
+        gl.uniform1fv(program.uniformLocations.uGrayChannel, gray);
+      });
+    };
 
-    var kernels = {
-      gaussianBlur: [
-        1, 2, 1,
-        2, 4, 2,
-        1, 2, 1
-      ],
-      laplacianEdge: [
-        0, -1, 0,
-        -1, 4, -1,
-        0, -1, 0
-      ]
+    this.setMat3kernel = function(kernel) {
+      var weight = kernel.reduce((prev, curr) => prev + curr);
+      var newFs = `
+        precision highp float;
+        varying highp vec2 vTextureCoord;
+        uniform sampler2D uSampler;
+
+        uniform vec2 uTextureSize;
+        uniform float uKernel[9];
+        uniform float uKernelWeight;
+
+        void main(void) {
+          vec2 onePixel = vec2(1.0, 1.0) / uTextureSize;
+          vec4 colorSum =
+            texture2D(uSampler, vTextureCoord + onePixel * vec2(-1, -1)) * uKernel[0] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 0, -1)) * uKernel[1] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 1, -1)) * uKernel[2] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2(-1,  0)) * uKernel[3] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 0,  0)) * uKernel[4] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 1,  0)) * uKernel[5] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2(-1,  1)) * uKernel[6] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 0,  1)) * uKernel[7] +
+            texture2D(uSampler, vTextureCoord + onePixel * vec2( 1,  1)) * uKernel[8] ;
+          gl_FragColor = vec4((colorSum / uKernelWeight).rgb, 1);
+        }
+      `;
+
+      initShaderProgram(vs, newFs,  {
+        uTextureSize: 'uTextureSize',
+        uKernel: 'uKernel[0]',
+        uKernelWeight: 'uKernelWeight'
+      });
+      render(function() {
+        gl.uniform2f(program.uniformLocations.uTextureSize, image.width, image.height);
+        gl.uniform1fv(program.uniformLocations.uKernel, kernel);
+        gl.uniform1f(program.uniformLocations.uKernelWeight, weight <= 0 ? 1 : weight);
+      });
+    };
+
+    this.setThreshold = function(value) {
+      var newFs = `
+        precision highp float;
+        varying highp vec2 vTextureCoord;
+        uniform sampler2D uSampler;
+        uniform float uThreshold;
+
+        void main(void) {
+          float gray = texture2D(uSampler, vTextureCoord).g;
+          gl_FragColor.rgb = texture2D(uSampler, vTextureCoord).rgb;
+          gl_FragColor.a = step(uThreshold, gray);  // returns 0.0 if x is smaller then edge and otherwise 1.0.
+        }
+      `;
+
+      initShaderProgram(vs, newFs, {
+        uThreshold: 'uThreshold',
+      });
+      render(function() {
+        gl.uniform1f(program.uniformLocations.uThreshold, value);
+      });
     };
 
     initialize();
