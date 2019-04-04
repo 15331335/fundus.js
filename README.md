@@ -4,11 +4,9 @@ Fundus.js is my graduation design.
 
 ## Attention
 
-1. Install `WebAssembly` so that replace the `dist/gl-matrix.js`.
-
-2. Check the `dist/index.html` to understand the order of scripts.
-
-3. Use `npm` to install and run `compile` before `test`.
+1. The `WebAssembly` function is still in development.
+2. Use `npm run test` to see the demo in Google Chrome.
+3. The `src/index.js` can be referred directly.
 
 ## Demo
 
@@ -26,6 +24,9 @@ It is the fundus in JS:
 var f = new Fundus('glcanvas', 'http://localhost:8080/image.jpg');
 ```
 
-## TODO
+## Api
 
-...
+- `reset()`: reset the image to origin.
+- `setGrayChannel(channnel)`: get the gray image using a parameter in `rgb`.
+- `setMat3kernel(kernel)`: the convolution kernel need a `3*3 matrix`
+- `setThreshold(value)`: the value must between `0` to `1`.
