@@ -6,7 +6,6 @@ Fundus.js is my graduation design.
 
 1. The `WebAssembly` function is still in development.
 2. Use `npm run test` to see the demo in Google Chrome.
-3. The `src/index.js` can be referred directly.
 
 ## Demo
 
