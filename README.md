@@ -4,8 +4,8 @@ Fundus.js is my graduation design.
 
 ## Attention
 
-1. The `WebAssembly` function is still in development.
-2. Use `npm run test` to see the demo in Google Chrome.
+1. Install `WebAssembly`.
+2. Run `compile` before `test`.
 
 ## Demo
 
@@ -26,6 +26,4 @@ var f = new Fundus('glcanvas', 'http://localhost:8080/image.jpg');
 ## Api
 
 - `reset()`: reset the image to origin.
-- `setGrayChannel(channnel)`: get the gray image using a parameter in `rgb`.
 - `setMat3kernel(kernel)`: the convolution kernel need a `3*3 matrix`
-- `setThreshold(value)`: the value must between `0` to `1`.
