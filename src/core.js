@@ -166,7 +166,7 @@ function Fundus(canvasId, imageUrl, options) {
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
   }
 
-  var scaleOffset = 1.0, scaleStep = 0.1, scaleMin = 1.0, scaleMax = 100.0;
+  var scaleOffset = 1.0, scaleStep = 0.1;  // scaleMin = 1.0, scaleMax = 100.0;
   var dragging = false, lastPos = {}, translateStep = 0.002;
   var translateOffset = { x: 0, y: 0 };
   var center = { x: 0, y: 0 };
@@ -231,19 +231,6 @@ function Fundus(canvasId, imageUrl, options) {
     render();
   };
 
-  this.setGrayChannel = function(channel) {
-    var gray = [0.0, 0.0, 0.0];
-    gray['rgb'.indexOf(channel)] = 1.0;
-    var shader = require('./shaders/gray');
-
-    initShaderProgram(shader.vs, shader.fs, {
-      uGrayChannel: 'uGrayChannel[0]',
-    });
-    render(function() {
-      gl.uniform1fv(program.uniformLocations.uGrayChannel, gray);
-    });
-  };
-
   this.setMat3kernel = function(kernel) {
     var weight = kernel.reduce((prev, curr) => prev + curr);
     var shader = require('./shaders/mat3conv');
@@ -260,18 +247,25 @@ function Fundus(canvasId, imageUrl, options) {
     });
   };
 
-  this.setThreshold = function(value) {
-    var shader = require('./shaders/threshold');
+  this.drawHist = function() {
+    var hist = require('./hist');
+    hist.draw(canvas, image);
+  }
 
-    initShaderProgram(shader.vs, shader.fs, {
-      uThreshold: 'uThreshold',
-    });
-    render(function() {
-      gl.uniform1f(program.uniformLocations.uThreshold, value);
-    });
-  };
-
-  initialize();
+  if (!window.wasmLoaded) {
+    var wasmscript = document.createElement("script")
+    wasmscript.type = "text/javascript";
+    wasmscript.onload = function() {
+      window.addEventListener("wasmLoaded", () => {
+        window.wasmLoaded = true;
+        initialize();
+      });
+    };
+    wasmscript.src = './wasm.js';
+    document.body.appendChild(wasmscript);
+  } else {
+    initialize();
+  }
 }
 
 module.exports = Fundus;
