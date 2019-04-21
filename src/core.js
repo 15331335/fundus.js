@@ -1,4 +1,4 @@
-function Fundus(canvasId, imageUrl, options) {
+function Fundus(canvasId, imageUrl, wasmUrl, options) {
   var canvas = document.getElementById(canvasId);
   var image = new Image();
   var gl, program, buffers, texture;
@@ -231,7 +231,7 @@ function Fundus(canvasId, imageUrl, options) {
     render();
   };
 
-  this.setMat3kernel = function(kernel) {
+  this.mat3Convolution = function(kernel) {
     var weight = kernel.reduce((prev, curr) => prev + curr);
     var shader = require('./shaders/mat3conv');
 
@@ -247,9 +247,22 @@ function Fundus(canvasId, imageUrl, options) {
     });
   };
 
-  this.drawHist = function() {
-    var hist = require('./hist');
-    hist.draw(canvas, image);
+  this.histEqualization = function() {
+    var cdf = require('./wasms/cdf').getCDF(image);
+    var shader = require('./shaders/histe');
+
+    initShaderProgram(shader.vs, shader.fs,  {
+      uSum: 'uSum',
+      uRcdf: 'uRcdf[0]',
+      uGcdf: 'uGcdf[0]',
+      uBcdf: 'uBcdf[0]'
+    });
+    render(function() {
+      gl.uniform1f(program.uniformLocations.uSum, image.width * image.height);
+      gl.uniform1fv(program.uniformLocations.uRcdf, cdf.r);
+      gl.uniform1fv(program.uniformLocations.uGcdf, cdf.g);
+      gl.uniform1fv(program.uniformLocations.uBcdf, cdf.b);
+    });
   }
 
   if (!window.wasmLoaded) {
@@ -261,7 +274,7 @@ function Fundus(canvasId, imageUrl, options) {
         initialize();
       });
     };
-    wasmscript.src = './wasm.js';
+    wasmscript.src = wasmUrl;
     document.body.appendChild(wasmscript);
   } else {
     initialize();

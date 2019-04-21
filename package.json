@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "webpack && webpack-dev-server --open 'Google Chrome'",
-    "compile": "emcc src/wasm.cpp -s WASM=1 -o dist/wasm.html -s \"EXTRA_EXPORTED_RUNTIME_METHODS=['ccall']\" -s ALLOW_MEMORY_GROWTH=1"
+    "compile": "emcc src/wasms/wasm.cpp -s WASM=1 -o dist/wasm.html -s \"EXTRA_EXPORTED_RUNTIME_METHODS=['ccall']\" -s ALLOW_MEMORY_GROWTH=1"
   },
   "repository": {
     "type": "git",
