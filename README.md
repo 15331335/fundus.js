@@ -1,29 +1,20 @@
 # Fundus.js
 
-Fundus.js is my graduation design.
+High-resolution images can be processed efficiently in browsers.
 
 ## Attention
 
 1. Install `WebAssembly`.
 2. Run `compile` before `test`.
+3. Dont `new` too much at a time.
+4. Many effects are still under development.
 
-## Demo
-
-A canvas element with an id in HTML:
-
-```html
-<canvas id="glcanvas" width="640" height="480">
-    Your browser doesn't appear to support the HTML5 <code>&lt;canvas&gt;</code> element.
-</canvas>
-```
-
-It is the fundus in JS:
+## Usage
 
 ```javascript
-var f = new Fundus('glcanvas', 'http://localhost:8080/image.jpg');
+var f = new Fundus(canvasId, imageUrl, wasmUrl);
+f.mat3Convolution([0,-1,0,-1,4,-1,0,-1,0]);  // webgl only, edge detection
+f.histEqualization();  // webgl with webassembly
+f.reset();
 ```
-
-## Api
-
-- `reset()`: reset the image to origin.
-- `setMat3kernel(kernel)`: the convolution kernel need a `3*3 matrix`
+![lena](./dist/lenas.png)
